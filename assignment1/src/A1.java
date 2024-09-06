@@ -22,9 +22,12 @@ public class A1 {
 
         List<List<String>> importedFile = importFile(filePath);
         List<Process> processList = Process.getProcessList(importedFile);
-        // System.out.println(Scheduler.FCFS(processList, Process.getDispatcher(importedFile)));
-        // System.out.println(Scheduler.SRT(processList, Process.getDispatcher(importedFile)));
-        System.out.println(Scheduler.FBV(processList, Process.getDispatcher(importedFile)));
+
+        List<Float> FCFSAverages = Scheduler.FCFS(processList, Process.getDispatcher(importedFile));
+        System.out.println("--------------------------------------------------");
+        List<Float> SRTAverages = Scheduler.SRT(processList, Process.getDispatcher(importedFile));
+        System.out.println("--------------------------------------------------");
+        List<Float> FBVAverages = Scheduler.FBV(processList, Process.getDispatcher(importedFile));
 
     }
 
@@ -46,28 +49,6 @@ public class A1 {
             System.exit(1);
         }
         return linesList;
-    }
-
-
-    public static void printSchedulerMovements(List<List<List<String>>> SchedulerOutput){
-        int i = 0;
-        List<List<String>> TimeStamps = SchedulerOutput.get(0);
-        List<List<String>> TurnAroundTimes = SchedulerOutput.get(1);
-
-        for ( List<String> TimeStamp : TimeStamps){
-            System.out.println(TimeStamp.get(0) + TimeStamp.get(1));
-        }
-
-        System.out.println("\nProcess  Turnaround Time  Waiting Time");
-    
-        while(i < TurnAroundTimes.size()){
-            System.out.println(TurnAroundTimes.get(i).get(0) + "        "+ TurnAroundTimes.get(i).get(1) + "               " + TurnAroundTimes.get(i).get(2));
-            i++;
-        }
-        System.out.println();
-        System.out.println("-------------------------------------------");
-        System.out.println();
-
     }
     
 }
@@ -240,40 +221,75 @@ class Scheduler{
         return TimeRemaining;
     }
 
-    public static String FCFS(List<Process> ProcessList, int Dispatcher) {
+    public static List<Float> FCFS(List<Process> ProcessList, int Dispatcher) {
         List<Process> Processes = new ArrayList<>(ProcessList);
-        int WaitingTime = 0;
-        int StartTime, TurnaroundTime;
+        List<Process> ReadyQueue = new ArrayList<>();
+        List<Float> averages = new ArrayList<>();
         String Schedule = "FCFS:\n";
         String TurnAround = "\nProcess  Turnaround Time  Waiting Time\n";
-        int i = 0;
+        int i;
+        int CurrentTime = 0;
+        float TotalTurnAroundTime = 0;
+        float TotalWaitTime = 0;
+        int FinishedCount = 0;
 
         int processCount = Processes.size();
-        while (i < processCount) {
-            int ArrTime = Processes.get(i).getArrTime();
-            int SrvTime = Processes.get(i).getSrvTime();
-    
-            StartTime = Math.max(WaitingTime, ArrTime) + Dispatcher;
-            TurnaroundTime = StartTime + SrvTime - ArrTime;
-            WaitingTime = StartTime - ArrTime;
 
-            Schedule += "T" + StartTime + ": " + Processes.get(i).getPID() + "\n";
-            TurnAround += Processes.get(i).getPID() + "       "  + TurnaroundTime + "               "  + WaitingTime + "\n";
+        while (FinishedCount < processCount){
 
-            WaitingTime = StartTime + SrvTime;
-            i++;
+            //Checking if new processes have arrived
+            for (i = 0; i < Processes.size(); i++){
+                if (Processes.get(i).getArrTime() <= CurrentTime) {
+                    ReadyQueue.add(Processes.get(i));
+                    Processes.remove(i);
+                    i--;
+                }
+            }
+
+            if (!ReadyQueue.isEmpty()){
+
+                Schedule += "T" + CurrentTime + ": " + ReadyQueue.get(0).getPID() + "\n";
+
+                CurrentTime += ReadyQueue.get(0).getSrvTime() + Dispatcher;
+
+                for (i = 0; i < ReadyQueue.size(); i++){
+                    ReadyQueue.get(i).updateTurnAroundTime(CurrentTime);
+                }
+
+                TotalTurnAroundTime += ReadyQueue.get(0).getTurnAroundTime();
+                TotalWaitTime += (ReadyQueue.get(0).getTurnAroundTime()-ReadyQueue.get(0).getSrvTime());
+
+                TurnAround += ReadyQueue.get(0).getPID() + "       "  + ReadyQueue.get(0).getTurnAroundTime() + "               "  + (ReadyQueue.get(0).getTurnAroundTime()-ReadyQueue.get(0).getSrvTime()) + "\n";
+
+                ReadyQueue.remove(0);
+                FinishedCount++;
+
+            }
+            else CurrentTime++;
+
         }
-        return Schedule + TurnAround;
+
+
+        System.out.println(Schedule + TurnAround);
+
+        averages.add((TotalTurnAroundTime/FinishedCount));
+        averages.add(TotalWaitTime/FinishedCount);
+
+        return averages;
     }
 
-    public static String SRT(List<Process> Processes, int Dispatcher) {
+    public static List<Float> SRT(List<Process> Processes, int Dispatcher) {
         int currentTime = 0;
         int totalProcesses = Processes.size();
+        float TotalTurnAroundTime;
+        float TotalWaitTime;
         List<Process> ReadyQueue = new ArrayList<>();
-        List<Process> SortedProcesses = new ArrayList<>(sortListBySRT(Processes));
+        List<Process> ProcessesCopy = new ArrayList<>(Processes);
+        List<Process> SortedProcesses = new ArrayList<>(sortListBySRT(ProcessesCopy));
         List<Process> completedProcesses = new ArrayList<>();
         List<List<String>> TimeStamps = new ArrayList<>();
-        String Output = "";
+        List<Float> averages = new ArrayList<>();
+        String Output = "\nSRT:\n";
         String previousPID = "Idle";
         boolean minExecution = false;
         // Min execution is because a program must execute a minimum of 1 time unit if it is loaded in
@@ -303,6 +319,7 @@ class Scheduler{
                     // "If program is complete, run dispatcher and move the program to the "Completed Programs"
                     if (ReadyQueue.get(0).getTimeRemaining() == 0) {
                         completedProcesses.add(ReadyQueue.get(0));
+
                         ReadyQueue.remove(0);
                         minExecution = false;
                     }
@@ -318,6 +335,7 @@ class Scheduler{
                     minExecution = false;
                 }
 
+                // Output Formatting
                 if (ReadyQueue.isEmpty()) previousPID = "Idle";
                 else {
                     previousPID = ReadyQueue.get(0).getPID();
@@ -356,26 +374,41 @@ class Scheduler{
             completedProcesses = sortListByArrTime(completedProcesses);
 
             Output += "\nProcess  Turnaround Time  Waiting Time\n";
-            
             for(int i = 0; i < completedProcesses.size(); i++){
                 Output += completedProcesses.get(i).getPID() + "       " + Integer.toString(completedProcesses.get(i).getTurnAroundTime()) + "                " + (completedProcesses.get(i).getTurnAroundTime() - completedProcesses.get(i).getSrvTime()) + "\n";
             }
+
+            System.out.println(Output);
+
+            // Calculating Average Turnaround Time
+            TotalTurnAroundTime = 0;
+            for(Process Step : completedProcesses){
+                TotalTurnAroundTime += Step.getTurnAroundTime();
+            }
+            averages.add(TotalTurnAroundTime/completedProcesses.size());
+
+            //Calculating average wait Time
+            TotalWaitTime = 0;
+            for (Process Step : completedProcesses){
+                TotalWaitTime += (Step.getTurnAroundTime()-Step.getSrvTime());
+            }
+            averages.add(TotalWaitTime/completedProcesses.size());
         
         }
 
-        return Output; // Replace this with the actual return logic
+        return averages;
     }
 
-    public static String FBV(List<Process> Processes, int Dispatcher){
-        String Output = "";
+    public static List<Float> FBV(List<Process> Processes, int Dispatcher){
+        String Output = "\nFBV:\n";
         List<List<String>> TimeStamps = new ArrayList<>();
-        List<List<String>> TurnAroundTimes = new ArrayList<>();
         List<Process> CopyOfProcesses = new ArrayList<>(Processes);
         List<Process> SortedProcesses = sortListByArrTime(CopyOfProcesses);
         List<Process> HighPriority = new ArrayList<>();
         List<Process> MediumPriority = new ArrayList<>();
         List<Process> LowPriority = new ArrayList<>();
         List<Process> CompletedProcesses = new ArrayList<>();
+        List<Float> averages = new ArrayList<>();
         int i;
         int currentTime = 0;
 
@@ -399,10 +432,7 @@ class Scheduler{
 
                 
                 // Output Information Capturing
-                List<String> entry = new ArrayList<>();
-                entry.add("T" + currentTime + ": ");
-                entry.add(HighPriority.get(0).getPID());
-                TimeStamps.add(entry);
+                Output += "T" + currentTime + ": " + HighPriority.get(0).getPID() + "\n";
 
                 // Time slice has been completed. If the remaining time is less than the full slice, the full slice is not consumed, only the time remaining
                 if(HighPriority.get(0).getTimeRemaining() >= 2){
@@ -461,10 +491,7 @@ class Scheduler{
                 currentTime += Dispatcher;
 
                 // Output Information Capturing
-                List<String> entry = new ArrayList<>();
-                entry.add("T" + currentTime + ": ");
-                entry.add(MediumPriority.get(0).getPID());
-                TimeStamps.add(entry);
+                Output += "T" + currentTime + ": " + MediumPriority.get(0).getPID() + "\n";
 
                 // Time Slice is consumed. If time remaining is less than the full slice, the full slice is not used, only the time remaining
                 if(MediumPriority.get(0).getTimeRemaining() >= 4){
@@ -519,10 +546,7 @@ class Scheduler{
                 currentTime += Dispatcher;
 
                 // Output Information Capturing
-                List<String> entry = new ArrayList<>();
-                entry.add("T" + currentTime + ": ");
-                entry.add(LowPriority.get(0).getPID());
-                TimeStamps.add(entry);
+                Output += "T" + currentTime + ": " + LowPriority.get(0).getPID() + "\n";
 
                 // Time Slice is consumed. If time remaining is less than the full slice, the full slice is not used, only the time remaining
                 if(LowPriority.get(0).getTimeRemaining() >= 4){
@@ -567,21 +591,32 @@ class Scheduler{
             } 
 
         }
-        System.out.println("FBV");
-        for( List<String> timestamp : TimeStamps){
-            System.out.println(timestamp.get(0) + " " + timestamp.get(1));
-        }
-        System.out.println("\nProcess  Turnaround Time  Waiting Time");
+
+        
+        Output += "\nProcess  Turnaround Time  Waiting Time\n";
         i = 0;
         while (i < CompletedProcesses.size()){
-            System.out.println(CompletedProcesses.get(i).getPID() + "        " + CompletedProcesses.get(i).getTurnAroundTime() + "               " + (CompletedProcesses.get(i).getTurnAroundTime()-CompletedProcesses.get(i).getSrvTime()));
+            Output += CompletedProcesses.get(i).getPID() + "        " + CompletedProcesses.get(i).getTurnAroundTime() + "               " + (CompletedProcesses.get(i).getTurnAroundTime()-CompletedProcesses.get(i).getSrvTime()) + "\n";
             i++;
         }
-            
         
-        
+        // Calculating Average Turnaround Time
+        float TotalTurnAround = 0;
+        for(Process Step : CompletedProcesses){
+            TotalTurnAround += Step.getTurnAroundTime();
+        }
+        averages.add(TotalTurnAround/CompletedProcesses.size());
 
-        return Output;
+        //Calculating average wait Time
+        float TotalWaitTime = 0;
+        for (Process Step : CompletedProcesses){
+            TotalWaitTime += (Step.getTurnAroundTime()-Step.getSrvTime());
+        }
+        averages.add(TotalWaitTime/CompletedProcesses.size());
+
+        System.out.println(Output);
+
+        return averages;
         
     } 
 }    
