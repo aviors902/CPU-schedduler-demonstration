@@ -662,7 +662,6 @@ class Scheduler{
         String Output = "\nLTR:\n";
 
         while (CompletedProcesses.size() != Processes.size()){
-
             // Checking if any processes have arrived
             for (i = 0; i < ProcessList.size(); i++) {
                 if (ProcessList.get(i).getArrTime() <= CurrentTime) {
@@ -675,39 +674,18 @@ class Scheduler{
 
             if(ReadyQueue.isEmpty()){
                 CurrentTime++;
-            }
-
-            // The lottery will not run for a queue size of 1 because there is no point since the only process in queue has a 100% chance of running, so it 
-            // is left out to save unnecessary overhead
-            if(ReadyQueue.size() == 1){
-
-                CurrentTime += Dispatcher;
-
-                // Output Information Capturing
-                Output += "T" + CurrentTime + ": " + ReadyQueue.get(0).getPID() + "\n";
-
-                // Time Reduction & Wait time tracking Logic for each process
-                if(ReadyQueue.get(0).getTimeRemaining() >= 3){
-                    CurrentTime += 3;
-                    ReadyQueue.get(0).lowerTimeRemaining(3);
-                    ReadyQueue.get(0).updateTurnAroundTime(CurrentTime);
+                // Checking if any processes have arrived
+                for (i = 0; i < ProcessList.size(); i++) {
+                    if (ProcessList.get(i).getArrTime() <= CurrentTime) {
+                        ReadyQueue.add(ProcessList.get(i));
+                        TotalTickets += ProcessList.get(i).getTickets();
+                        ProcessList.remove(i);
+                        i--;
+                    }
                 }
-                else{
-                    CurrentTime += ReadyQueue.get(0).getTimeRemaining();
-                    ReadyQueue.get(0).lowerTimeRemaining(ReadyQueue.get(0).getTimeRemaining());
-                    ReadyQueue.get(0).updateTurnAroundTime(CurrentTime);
-                }
-
-                // Checking to see if the process is finished
-                if (ReadyQueue.get(0).getTimeRemaining() == 0){
-                    CompletedProcesses.add(ReadyQueue.get(0));
-                    TotalTickets -= ReadyQueue.get(0).getTickets();
-                    ReadyQueue.remove(0);
-                }
-                
             }
             
-            if(ReadyQueue.size() > 1){
+            if(!ReadyQueue.isEmpty()){
 
                 CurrentTime += Dispatcher;
 
@@ -737,11 +715,26 @@ class Scheduler{
                     ReadyQueue.get(i).updateTurnAroundTime(CurrentTime);
                 }
 
-                // Checking to see if the process is finished
+                // Checking if any processes have arrived during operation
+                for (int z = 0; z < ProcessList.size(); z++) {
+                    if (ProcessList.get(z).getArrTime() <= CurrentTime) {
+                        ReadyQueue.add(ProcessList.get(z));
+                        TotalTickets += ProcessList.get(z).getTickets();
+                        ProcessList.remove(z);
+                        z--;
+                    }
+                }
+                
+                // Checking to see if the process is finished, otherwise adding it to the back of the queue
                 if (ReadyQueue.get(i).getTimeRemaining() == 0){
                     CompletedProcesses.add(ReadyQueue.get(i));
                     TotalTickets -= ReadyQueue.get(i).getTickets();
                     ReadyQueue.remove(i);
+                }
+                else{
+                    Process temp = ReadyQueue.get(i);
+                    ReadyQueue.remove(i);
+                    ReadyQueue.add(temp);
                 }
 
             }
