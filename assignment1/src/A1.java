@@ -130,7 +130,6 @@ class Process {
         return lowPrio;
     }
 
-
     public static List<Process> getProcessList(List<List<String>> linesList){
         List<Process> ProcessList  = new ArrayList<>();
         int i = 0;
@@ -176,6 +175,17 @@ class Process {
 }
 
 class Scheduler{
+    
+    // Simple cloning function for creating deep copies of processLists
+    public static List<Process> clone(List<Process> Original){
+        List<Process> copy = new ArrayList<>();
+        for (Process current : Original){
+            Process temp = new Process(current.getPID(), current.getArrTime(), current.getSrvTime(), current.getTickets());
+            copy.add(temp);
+        }
+        return copy;
+    }
+
     public static List<Process> sortListByArrTime(List<Process> Processes){
         List<Process> ProcessList = Processes;
         List<Process> ArrivalOrder = new ArrayList<>();
@@ -222,7 +232,7 @@ class Scheduler{
     }
 
     public static List<Float> FCFS(List<Process> ProcessList, int Dispatcher) {
-        List<Process> Processes = new ArrayList<>(ProcessList);
+        List<Process> Processes = clone(ProcessList);
         List<Process> ReadyQueue = new ArrayList<>();
         List<Float> averages = new ArrayList<>();
         String Schedule = "FCFS:\n";
@@ -259,7 +269,7 @@ class Scheduler{
                 TotalTurnAroundTime += ReadyQueue.get(0).getTurnAroundTime();
                 TotalWaitTime += (ReadyQueue.get(0).getTurnAroundTime()-ReadyQueue.get(0).getSrvTime());
 
-                TurnAround += ReadyQueue.get(0).getPID() + "       "  + ReadyQueue.get(0).getTurnAroundTime() + "               "  + (ReadyQueue.get(0).getTurnAroundTime()-ReadyQueue.get(0).getSrvTime()) + "\n";
+                TurnAround += ReadyQueue.get(0).getPID() + "       "  + ReadyQueue.get(0).getTurnAroundTime() + "                "  + (ReadyQueue.get(0).getTurnAroundTime()-ReadyQueue.get(0).getSrvTime()) + "\n";
 
                 ReadyQueue.remove(0);
                 FinishedCount++;
@@ -284,8 +294,7 @@ class Scheduler{
         float TotalTurnAroundTime;
         float TotalWaitTime;
         List<Process> ReadyQueue = new ArrayList<>();
-        List<Process> ProcessesCopy = new ArrayList<>(Processes);
-        List<Process> SortedProcesses = new ArrayList<>(sortListBySRT(ProcessesCopy));
+        List<Process> SortedProcesses = new ArrayList<>(sortListBySRT(clone(Processes)));
         List<Process> completedProcesses = new ArrayList<>();
         List<List<String>> TimeStamps = new ArrayList<>();
         List<Float> averages = new ArrayList<>();
@@ -401,9 +410,7 @@ class Scheduler{
 
     public static List<Float> FBV(List<Process> Processes, int Dispatcher){
         String Output = "\nFBV:\n";
-        List<List<String>> TimeStamps = new ArrayList<>();
-        List<Process> CopyOfProcesses = new ArrayList<>(Processes);
-        List<Process> SortedProcesses = sortListByArrTime(CopyOfProcesses);
+        List<Process> SortedProcesses = sortListByArrTime(clone(Processes));
         List<Process> HighPriority = new ArrayList<>();
         List<Process> MediumPriority = new ArrayList<>();
         List<Process> LowPriority = new ArrayList<>();
@@ -619,4 +626,13 @@ class Scheduler{
         return averages;
         
     } 
+
+    public static List<Float> LTR(List<Process> Processes, int Dispatcher, List<Integer> RandomNumbers){
+    List<Float> averages = new ArrayList<>(); 
+
+
+
+
+        return averages;
+    }
 }    
