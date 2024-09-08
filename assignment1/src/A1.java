@@ -1,3 +1,8 @@
+/*
+ * This is an assignment piece for comp2240 (Operating Systems)
+ * Semester 2 2024 
+ * The purpose of this assignment is to demonstrate some of the fundamental cpu Task Scheduling algorithms
+ */
 import java.io.BufferedReader;
 import java.io.File;
 import java.io.FileReader;
@@ -5,6 +10,8 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import java.util.stream.Collectors;
+
 
 public class A1 {
     public static void main(String[] args) {
@@ -22,12 +29,22 @@ public class A1 {
 
         List<List<String>> importedFile = importFile(filePath);
         List<Process> processList = Process.getProcessList(importedFile);
+        List<Integer> Lottery = Process.getRandomLottery(importedFile);
 
         List<Float> FCFSAverages = Scheduler.FCFS(processList, Process.getDispatcher(importedFile));
         System.out.println("--------------------------------------------------");
         List<Float> SRTAverages = Scheduler.SRT(processList, Process.getDispatcher(importedFile));
         System.out.println("--------------------------------------------------");
         List<Float> FBVAverages = Scheduler.FBV(processList, Process.getDispatcher(importedFile));
+        System.out.println("--------------------------------------------------");
+        List<Float> LTRAverages = Scheduler.LTR(processList, Process.getDispatcher(importedFile), Lottery);
+        System.out.println("--------------------------------------------------");
+
+        System.out.println("Summary\nAlgorithm   Average Turnaround Time  Waiting Time");
+        System.out.println("FCFS         " + FCFSAverages.get(0) + "                      " + FCFSAverages.get(1));
+        System.out.println("SRT          " + SRTAverages.get(0) + "                       " + SRTAverages.get(1));
+        System.out.println("FBV          " + FBVAverages.get(0) + "                      " + FBVAverages.get(1));
+        System.out.println("LTR          " + LTRAverages.get(0) + "                      " + LTRAverages.get(1));
 
     }
 
@@ -150,7 +167,7 @@ class Process {
         return ProcessList;
     }
 
-    public static List<Integer> getRandom(List<List<String>> linesList){
+    public static List<Integer> getRandomLottery(List<List<String>> linesList){
         List<Integer> RandomList  = new ArrayList<>();
         int i = 0;
         while(!linesList.get(i).get(0).equals("BEGINRANDOM")){
@@ -208,6 +225,7 @@ class Scheduler{
         }
         return ArrivalOrder;
     }
+
     public static List<Process> sortListBySRT(List<Process> Processes){
         List<Process> ProcessList = Processes;
         List<Process> TimeRemaining = new ArrayList<>();
@@ -230,6 +248,9 @@ class Scheduler{
         }
         return TimeRemaining;
     }
+
+
+
 
     public static List<Float> FCFS(List<Process> ProcessList, int Dispatcher) {
         List<Process> Processes = clone(ProcessList);
@@ -628,10 +649,132 @@ class Scheduler{
     } 
 
     public static List<Float> LTR(List<Process> Processes, int Dispatcher, List<Integer> RandomNumbers){
-    List<Float> averages = new ArrayList<>(); 
+        List<Float> averages = new ArrayList<>(); 
+        List<Integer> LotteryNumbers = RandomNumbers.stream().collect(Collectors.toList());
+        List<Process> ProcessList = clone(Processes);
+        List<Process> ReadyQueue = new ArrayList<>();
+        List<Process> CompletedProcesses = new ArrayList<>();
+        int CurrentTime = 0;
+        int TotalTickets = 0;
+        int LotteryCount = 0;
+        int rollLottery; 
+        int i;
+        String Output = "\nLTR:\n";
+
+        while (CompletedProcesses.size() != Processes.size()){
+
+            // Checking if any processes have arrived
+            for (i = 0; i < ProcessList.size(); i++) {
+                if (ProcessList.get(i).getArrTime() <= CurrentTime) {
+                    ReadyQueue.add(ProcessList.get(i));
+                    TotalTickets += ProcessList.get(i).getTickets();
+                    ProcessList.remove(i);
+                    i--;
+                }
+            }
+
+            if(ReadyQueue.isEmpty()){
+                CurrentTime++;
+            }
+
+            // The lottery will not run for a queue size of 1 because there is no point since the only process in queue has a 100% chance of running, so it 
+            // is left out to save unnecessary overhead
+            if(ReadyQueue.size() == 1){
+
+                CurrentTime += Dispatcher;
+
+                // Output Information Capturing
+                Output += "T" + CurrentTime + ": " + ReadyQueue.get(0).getPID() + "\n";
+
+                // Time Reduction & Wait time tracking Logic for each process
+                if(ReadyQueue.get(0).getTimeRemaining() >= 3){
+                    CurrentTime += 3;
+                    ReadyQueue.get(0).lowerTimeRemaining(3);
+                    ReadyQueue.get(0).updateTurnAroundTime(CurrentTime);
+                }
+                else{
+                    CurrentTime += ReadyQueue.get(0).getTimeRemaining();
+                    ReadyQueue.get(0).lowerTimeRemaining(ReadyQueue.get(0).getTimeRemaining());
+                    ReadyQueue.get(0).updateTurnAroundTime(CurrentTime);
+                }
+
+                // Checking to see if the process is finished
+                if (ReadyQueue.get(0).getTimeRemaining() == 0){
+                    CompletedProcesses.add(ReadyQueue.get(0));
+                    TotalTickets -= ReadyQueue.get(0).getTickets();
+                    ReadyQueue.remove(0);
+                }
+                
+            }
+            
+            if(ReadyQueue.size() > 1){
+
+                CurrentTime += Dispatcher;
+
+                rollLottery = (LotteryNumbers.get(LotteryCount)) % TotalTickets;
+
+                // Finding the "winning" process
+                int TicketNumber = 0;
+                i = 0;
+                while(rollLottery > TicketNumber){
+                    TicketNumber += ReadyQueue.get(i).getTickets();
+                    if (rollLottery < TicketNumber) break;
+                    i++;
+                    
+                } 
+
+                // Output Information Capturing
+                Output += "T" + CurrentTime + ": " + ReadyQueue.get(i).getPID() + "\n";
+                // Time Reduction & Wait time tracking Logic for each process
+                if(ReadyQueue.get(i).getTimeRemaining() >= 3){
+                    CurrentTime += 3;
+                    ReadyQueue.get(i).lowerTimeRemaining(3);
+                    ReadyQueue.get(i).updateTurnAroundTime(CurrentTime);
+                }
+                else{
+                    CurrentTime += ReadyQueue.get(i).getTimeRemaining();
+                    ReadyQueue.get(i).lowerTimeRemaining(3);
+                    ReadyQueue.get(i).updateTurnAroundTime(CurrentTime);
+                }
+
+                // Checking to see if the process is finished
+                if (ReadyQueue.get(i).getTimeRemaining() == 0){
+                    CompletedProcesses.add(ReadyQueue.get(i));
+                    TotalTickets -= ReadyQueue.get(i).getTickets();
+                    ReadyQueue.remove(i);
+                }
+
+            }
 
 
+            if(LotteryCount == LotteryNumbers.size()-1){
+                LotteryCount = 0;
+            }
+            else LotteryCount++;
+        }
 
+        Output += "\nProcess  Turnaround Time  Waiting Time\n";
+        i = 0;
+        while (i < CompletedProcesses.size()){
+            Output += CompletedProcesses.get(i).getPID() + "        " + CompletedProcesses.get(i).getTurnAroundTime() + "               " + (CompletedProcesses.get(i).getTurnAroundTime()-CompletedProcesses.get(i).getSrvTime()) + "\n";
+            i++;
+        }
+        
+        // Calculating Average Turnaround Time
+        float TotalTurnAround = 0;
+        for(Process Step : CompletedProcesses){
+            TotalTurnAround += Step.getTurnAroundTime();
+        }
+        averages.add(TotalTurnAround/CompletedProcesses.size());
+
+        //Calculating average wait Time
+        float TotalWaitTime = 0;
+        for (Process Step : CompletedProcesses){
+            TotalWaitTime += (Step.getTurnAroundTime()-Step.getSrvTime());
+        }
+        averages.add(TotalWaitTime/CompletedProcesses.size());
+
+        System.out.println(Output);
 
         return averages;
     }
